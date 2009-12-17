@@ -1,0 +1,32 @@
+; Source name     : boot_utils.mac
+; Code model:     : Real mode flat model
+; Version         : 1.0
+; Created date    : 28/11/2009
+; Last update     : 28/11/2009
+; Author          : Malcolm Spiteri
+; Description     : Various macros for invoking BIOS services
+
+%macro clear_screen 0
+	call clear_screen
+%endmacro
+
+%macro write 1     					; 1 parameter pointing to the address of character stream
+	mov si,%1						; Print message
+%%write_start:
+    lodsb           				; AL = [DS:SI]
+    or al,al        				; Set zero flag if al=0
+    jz %%write_done 				; Jump to .done if zero flag is set
+    mov ah,0x0E						; Video function 0Eh
+    mov bx,0x0007					; Color
+    int 0x10
+    jmp %%write_start				; Load characters until AL=0	
+%%write_done:
+%endmacro
+
+%macro write_line 1     			; 1 parameter pointing to the address of character stream
+	write %1
+	mov al,0x0D
+    int 0x10
+	mov al,0x0A
+    int 0x10    	
+%endmacro
