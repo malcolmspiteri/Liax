@@ -7,7 +7,7 @@ nasm boot.asm -f bin -o boot.bin
 nasm MELOADER.asm -f bin -o MELOADER.SYS
 
 @ECHO Creating virtual floppy image
-vfd OPEN E:\Projects\MeliteOS\disk_images\1.img /NEW /W /144 /F
+vfd OPEN E:\Projects\MeliteOS\resources\disk_images\1.img /NEW /W /144 /F
 vfd FORMAT 0
 rem format A: /A:512 /Q /FS:FAT /V:test
 
