@@ -2,6 +2,8 @@ bits 16
 org 0x0
 
 %include "bios_utils.mac"
+%define BDA_SEGMENT 0x0040
+%define EQUIPMENT_OFFSET 0x0010
 
 section .text
 
@@ -17,11 +19,12 @@ start:
 	mov ax, cs
 	mov ds, ax
 	mov es, ax
-	SET_PRE_ISR_HOOK 0x24, word [old_kb_int_seg], word [old_kb_int_off], ds, hello_pp
+	;SET_PRE_ISR_HOOK 0x24, word [old_kb_int_seg], word [old_kb_int_off], ds, hello_pp
 	CLEAR_SCREEN
 	call show_banner3
-	WRITE msg
-	
+	call get_no_floppy_drives
+	WRITE_LINE msg
+	WRITE no_floppy_msg	
 	
 hang:	jmp hang
 
@@ -41,6 +44,26 @@ show_banner3:
 .done:
 	ret
 
+get_no_floppy_drives:
+	push fs
+	push si
+	push ax
+	mov ax, BDA_SEGMENT
+	mov fs, ax
+	mov si, EQUIPMENT_OFFSET
+	mov ax, WORD [fs:si] ; Read the equipment byte into ax
+	mov cl, al ; We copy the lower order byte so we can determine if a floppy drive is installed by reading bit 0
+	and cl, 0000_0001b ; clear out all bits except bit 0
+	and al, 1100_0000b ; clear all bits except 6 & 7 which indicate the no of floppy drives present
+	shr al, 0x06 ; shift bits 6/7 to 0/1
+	add al, cl ; Add the value of cl to al since al is the no of floppy drives minus 1
+	mov BYTE [no_floppy_drives], al	
+	add al, 0x30
+	mov BYTE [no_floppy_msg_val], al
+	pop ax
+	pop si
+	pop fs
+	ret
 
 ;AL = character to display.
 ;BH = page number.
@@ -48,7 +71,7 @@ show_banner3:
 ;CX = number of times to write character.
 show_banner2:
 	; Move fs to BDA
-	mov ax,0x0040
+	mov ax,BDA_SEGMENT
 	mov fs,ax
 	; Get the number of columns
 	mov di,0x004A 	
@@ -126,6 +149,11 @@ section .data
 
 msg db 'Welcome to Melite Loader'
 msg_end db 0x0
+
+no_floppy_msg db 'No of floppy drives detected: '
+no_floppy_msg_val db 0x0
+no_floppy_msg_end db 0x0
+
 hello_msg db 'You pressed', 0x0
 CRLF db 0x0D, 0x0A, 0x0
 kuku db 'A'
@@ -135,3 +163,5 @@ section .bss
 old_kb_int_seg resw 1
 old_kb_int_off resw 1
 pressed_key resb 1
+no_floppy_drives resb 1
+

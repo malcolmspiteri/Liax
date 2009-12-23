@@ -39,20 +39,20 @@ BPB_BYTES_PER_SECTOR:  		dw 512
 BPB_SECTORS_PER_CLUSTER: 	db 1
 BPB_NO_RES_SECTORS: 		dw 1
 BPB_NO_FATS: 	    		db 2
-BPB_ROOT_ENTRIES: 	    dw 224
-BPB_NO_SECTORS: 	    dw 2880
-BPB_MEDIA: 	            db 0xF0
-bpbSectorsPerFAT: 	    dw 9
-bpbSectorsPerTrack: 	dw 18
-bpbHeadsPerCylinder: 	dw 2
-bpbHiddenSectors: 	    dd 0
-bpbLargeSectors:     	dd 0
-bsDriveNumber: 	        db 0
-bsUnused: 	            db 0
-bsExtBootSignature: 	db 0x29
-bsSerialNumber:	        dd 0x3ced2208
-bsVolumeLabel: 	        db VOLUME_LABEL
-bsFileSystem: 	        db FILE_SYSTEM
+BPB_ROOT_ENTRIES: 	    	dw 224
+BPB_NO_SECTORS: 	    	dw 2880
+BPB_MEDIA: 	            	db 0xF0
+BPB_SECTORS_PER_FAT: 	    dw 9
+BPB_SECTORS_PER_TRACK: 		dw 18
+BPB_HEADS_PER_CYLINDER: 	dw 2
+bpbHiddenSectors: 	    	dd 0
+bpbLargeSectors:     		dd 0
+bsDriveNumber: 	        	db 0
+bsUnused: 	            	db 0
+bsExtBootSignature: 		db 0x29
+bsSerialNumber:	        	dd 0x3ced2208
+bsVolumeLabel: 	        	db VOLUME_LABEL
+bsFileSystem: 	        	db FILE_SYSTEM
 
 past_oem:
 
@@ -170,11 +170,11 @@ chs_to_lba:
 
 lba_to_chs:
     xor dx, dx                              ; prepare dx:ax for operation
-    div WORD [bpbSectorsPerTrack]           ; calculate
+    div WORD [BPB_SECTORS_PER_TRACK]           ; calculate
     inc dl                                  ; adjust for sector 0
     mov BYTE [ABS_SECTOR], dl
     xor dx, dx                              ; prepare dx:ax for operation
-    div WORD [bpbHeadsPerCylinder]          ; calculate
+    div WORD [BPB_HEADS_PER_CYLINDER]          ; calculate
     mov BYTE [ABS_HEAD], dl
     mov BYTE [ABS_TRACK], al
     ret
@@ -202,7 +202,7 @@ load_setup:
     ; compute location of root directory and store in "ax"
      
     mov al, BYTE [BPB_NO_FATS]        ; number of FATs
-    mul WORD [bpbSectorsPerFAT]       ; sectors used by FATs
+    mul WORD [BPB_SECTORS_PER_FAT]       ; sectors used by FATs
     add ax, WORD [BPB_NO_RES_SECTORS] ; adjust for bootsector
     mov WORD [datasector], ax         ; base of root directory
     add WORD [datasector], cx
@@ -249,7 +249,7 @@ load_fat:
      
     xor ax, ax
     mov al, BYTE [BPB_NO_FATS]          ; number of FATs
-    mul WORD [bpbSectorsPerFAT]             ; sectors used by FATs
+    mul WORD [BPB_SECTORS_PER_FAT]             ; sectors used by FATs
     mov cx, ax
 
     ; compute location of FAT and store in "ax"
