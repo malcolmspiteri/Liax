@@ -1,167 +1,137 @@
+;; The loader will do the following tasks:
+;; 	- Setup initial GDT and IDT
+;; 	- Switch to 32-bit PMode
+;; 	- Enable the A20 Gate
+;; 	- Setup stack for the kernel
+;; 	- Load the kernal at 0x100000 (past BIOS ROM)
+	
 bits 16
 org 0x0
 
 %include "bios_utils.mac"
-%define BDA_SEGMENT 0x0040
-%define EQUIPMENT_OFFSET 0x0010
+
+%define BS_SIG_OFFSET_LO 0x0410	; Detected hardware
+%define BS_SIG_OFFSET_HI 0x0420
 
 section .text
 
 start:
-	; clear registers
-	xor ax,ax
-	xor bx,bx
-	xor cx,cx
-	xor dx,dx	
-	xor si,si
-	xor di,di	
 	; make sure ds and es == cs
 	mov ax, cs
 	mov ds, ax
 	mov es, ax
-	;SET_PRE_ISR_HOOK 0x24, word [old_kb_int_seg], word [old_kb_int_off], ds, hello_pp
 	CLEAR_SCREEN
-	call show_banner3
-	call get_no_floppy_drives
-	WRITE_LINE msg
-	WRITE no_floppy_msg	
+	call draw_header
 	
+;; Determine if A20 gate is enabled by reading the BDA detected
+;; hardware WORD from  segments 0x0000 and 0xFFFF and comparing them
+	
+.handleA20:
+	;; Get the value of the WORD @ 0x0000:BS_ID_OFFSET and store it in BX
+	SET_CURSOR_POS 0x0, 0x2, 0x1
+	WRITE a20_msg		
+	mov ax, 0x0
+	mov fs, ax
+	mov ax, BS_SIG_OFFSET_LO
+	mov si, ax
+	mov bx, WORD [fs:si]
+	;; Ok now we change the segment to 0xFFFF, read the WORD at that location and store in DX
+	mov ax, 0xffff
+	mov fs, ax
+	mov ax, BS_SIG_OFFSET_HI
+	mov dx, WORD [fs:si]
+	;; Compare the 2 WORDs in BX & CX
+	test bx, dx
+	jne enableA20
+	WRITE ok_msg
+	;; Load the GDT
+	SET_CURSOR_POS 0x0, 0x3, 0x1
+	WRITE load_gdt_act
+	call load_gdt
+	WRITE ok_msg
+
 hang:	jmp hang
 
-; This call will fill up the first row of page 0, cols 0-79 with a red background
-show_banner3:
+enableA20:
+
+	ret
+
+;; Set the first row of page 0 to red background with yellow foreground
+;; and write header message
+	
+draw_header:
 .init:
+	push ax
+	push fs
+	push si
 	mov ax,0xb800
 	mov fs,ax
 	mov ax,0x0
 .loop:
 	mov si,ax
-	mov word [fs:si],0xDB44
-	cmp ax,0xA0 
-	jnb .done   
-	inc ax
+	mov word [fs:si],0x4E00
+	cmp ax,0x9E 
+	je .done
+	add ax, 0x2
 	jmp .loop
 .done:
-	ret
-
-get_no_floppy_drives:
-	push fs
-	push si
-	push ax
-	mov ax, BDA_SEGMENT
-	mov fs, ax
-	mov si, EQUIPMENT_OFFSET
-	mov ax, WORD [fs:si] ; Read the equipment byte into ax
-	mov cl, al ; We copy the lower order byte so we can determine if a floppy drive is installed by reading bit 0
-	and cl, 0000_0001b ; clear out all bits except bit 0
-	and al, 1100_0000b ; clear all bits except 6 & 7 which indicate the no of floppy drives present
-	shr al, 0x06 ; shift bits 6/7 to 0/1
-	add al, cl ; Add the value of cl to al since al is the no of floppy drives minus 1
-	mov BYTE [no_floppy_drives], al	
-	add al, 0x30
-	mov BYTE [no_floppy_msg_val], al
-	pop ax
+	SET_CURSOR_POS 0x0, 0x0, 0x1
+	WRITE msg
 	pop si
 	pop fs
+	pop ax
 	ret
 
-;AL = character to display.
-;BH = page number.
-;BL = attribute.
-;CX = number of times to write character.
-show_banner2:
-	; Move fs to BDA
-	mov ax,BDA_SEGMENT
-	mov fs,ax
-	; Get the number of columns
-	mov di,0x004A 	
-	mov cx,WORD [fs:di] 	; Store no of cols in cl
-	;dec cx
-	; Write char at cursor
-	mov al,0xDB
-	mov bh,0x0
-    mov bl,0x04						; Color
-    mov ah,0x09						; Video function 9
-    int 0x10	
+load_gdt:
 
-	mov al, 1
-	mov bh, 0
-	mov bl, 0100_1110b ; red_yellow
-	mov cx, msg_end - msg ;0x0018 ; length
-	mov dl, 1 ;col
-	mov dh, 0 ;row
-	push cs
-	pop es
-	mov bp, msg
-	mov ah, 13h
-	int 10h
+	cli
+	pusha
+	lgdt [gdt_pointer]		; load GDT into GDTR
+	sti
+	popa
 	ret
 
-show_banner:
-.start:
-	xor ax,ax
-	xor bx,bx
-	xor cx,cx
-	xor dx,dx
-	xor si,si	
-	; Set video mode
-	mov al, 0x03
-	mov ah, 0x0
-	int 10h	
-	; Move fs to BDA
-	mov ax,0x0040
-	mov fs,ax
-	; Get the number of columns
-	mov di,0x004A 	
-	mov cx,WORD [fs:di] 	; Store no of cols in cl
-	dec cl
-.loop:
-	; Move cursor to row 0 and col cl
-	mov bh,0x0   		; current page. 
-	mov dh,0x0   		; row. 
-	mov dl,cl	  		; col. 
-	mov ah,0x02			; BIOS function
-	int 0x10
-	; Write char at cursor
-	mov al,0xDB
-    mov ah,0x09						; Video function 9
-    mov bl,0x40						; Color
-    int 0x10	
-	; Check if we're done else loop
-	or cl,cl	
-	jz .success
-	dec cl
-	jmp .loop	
-.success:
-	ret
-	
+switch_to_pmode:
 
-hello_pp:
-	WRITE hello_msg
-	in	al,0x60	
-	mov byte [pressed_key], al
-	WRITE_LINE pressed_key	
-	push word [old_kb_int_seg]
-	push word [old_kb_int_off]
-	retf
 	
 section .data
 
-msg db 'Welcome to Melite Loader'
+msg db 'Melite Loader'
 msg_end db 0x0
-
-no_floppy_msg db 'No of floppy drives detected: '
-no_floppy_msg_val db 0x0
-no_floppy_msg_end db 0x0
-
-hello_msg db 'You pressed', 0x0
 CRLF db 0x0D, 0x0A, 0x0
-kuku db 'A'
+ok_msg db 'OK', 0x0
+a20_msg db 'Enabling the A20 gate...', 0x0
+load_gdt_act db 'Loading GDT...', 0x0
+switch_to_pmode_act db 'Switching to 32-bit Protected Mode...', 0x0
+
+gdt_table:	
+
+; Mandatory null descriptor 
+	dd 0 				
+	dd 0 
+
+; Code descriptor:
+	
+	dw 0FFFFh 			; limit low
+	dw 0 				; base low
+	db 0 				; base middle
+	db 10011010b 			; access
+	db 11001111b 			; granularity
+	db 0 				; base high
+
+; Data descriptor:
+	
+	dw 0FFFFh 			; limit low (Same as code)
+	dw 0 				; base low
+	db 0 				; base middle
+	db 10010010b 			; access
+	db 11001111b 			; granularity
+	db 0				; base high
+	
+end_of_gdt:
+
+gdt_pointer:
+	dw end_of_gdt - gdt_table - 1 	; limit (Size of GDT)
+	dd gdt_table 			; base of GDT
 
 section .bss
-
-old_kb_int_seg resw 1
-old_kb_int_off resw 1
-pressed_key resb 1
-no_floppy_drives resb 1
-

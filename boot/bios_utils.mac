@@ -43,20 +43,33 @@
 	pop ax       
 %endmacro
 
+%macro SET_CURSOR_POS 3
+	push ax
+	push bx
+	push dx	
+	mov bh,%1   		; page. 
+	mov dh,%2   		; row. 
+	mov dl,%3	  		; col. 
+	mov ah,0x02			; BIOS function
+	int 0x10
+	pop dx
+	pop bx
+	pop ax
+%endmacro
+
 %macro WRITE 1     					; 1 parameter pointing to the address of character stream
 	push si
 	push ax
 	push bx
 	mov si,%1						; Print message
-%%write_start:
+%%.write_start:
     lodsb           				; AL = [DS:SI]
     or al,al        				; Set zero flag if al=0
-    jz %%write_success	 			; Jump to .success if zero flag is set
-    mov ah,0x0E						; Video function 0Eh
-    mov bx,0x0007					; Color
+    jz %%.write_success	 			; Jump to .success if zero flag is set
+    mov ah,0x0E						; Video function 0Eh    
     int 0x10
-    jmp %%write_start				; Load characters until AL=0	
-%%write_success:
+    jmp %%.write_start				; Load characters until AL=0	
+%%.write_success:
 	pop bx
 	pop ax
 	pop si
