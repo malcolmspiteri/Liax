@@ -1,0 +1,99 @@
+get_no_floppy_drives:
+	push fs
+	push si
+	push ax
+	push cx
+	mov ax, BDA_SEGMENT
+	mov fs, ax
+	mov si, EQUIPMENT_OFFSET
+	mov ax, WORD [fs:si] ; Read the equipment byte into ax
+	mov cl, al ; We copy the lower order byte so we can determine if a floppy drive is installed by reading bit 0
+	and cl, 0000_0001b ; clear out all bits except bit 0
+	and al, 1100_0000b ; clear all bits except 6 & 7 which indicate the no of floppy drives present
+	shr al, 0x06 ; shift bits 6/7 to 0/1
+	add al, cl ; Add the value of cl to al since al is the no of floppy drives minus 1
+	mov BYTE [no_floppy_drives], al	
+	add al, 0x30
+	mov BYTE [no_floppy_msg_val], al
+	;; Restore registers prev vals
+	pop cx
+	pop ax
+	pop si
+	pop fs
+	ret
+
+get_mem_kb:
+	xor ax,ax
+	int 0x12 		; Get low memory RAM size in Kb
+	mov WORD [mem_amount_kb], ax
+	ret
+
+get_mem_kb2:
+	push fs
+	push si
+	push ax
+	mov ax, BDA_SEGMENT
+	mov fs, ax
+	mov si, MEM_AMOUNT_OFFSET
+	mov ax, WORD [fs:si] ; Read the memory amount word into ax
+	mov WORD [mem_amount_kb], ax
+	;; Restore registers prev vals
+	pop ax
+	pop si
+	pop fs
+	ret
+	
+; Takes a word from memory address in SI and stores its ascii representation in the memory address in DI
+word2ascii:
+.init:	
+	push ax
+	push bx
+	push dx	
+	xor ax, ax
+	mov bx, [si]
+	; Chars 1 & 2
+	mov al, bl ; Get the low order byte (which will be the first 2 chars - Intel is little endian)
+	; Second character
+	mov dl, al
+	call hex2ascii
+	mov [di+1], dh
+	; First character
+	shr ax, 0x4
+	mov dl, al
+	call hex2ascii
+	mov [di], dh	
+	; Chars 3 & 4
+	mov al, bh ; Get the high order byte now (which will be the second 2 chars)
+	; Fourth character
+	mov dl, al
+	call hex2ascii
+	mov [di+3], dh
+	; Third character
+	shr ax, 0x4
+	mov dl, al
+	call hex2ascii
+	mov [di+2], dh	
+.success:
+	pop dx
+	pop bx
+	pop ax
+	ret
+
+; Converts value of the low order nibble of DL to its ascii representation and stores in DH
+hex2ascii:
+	push ax
+	and dl,0000_1111b ; Make sure the high order nibble of DL is clear
+	cmp dl,0xA
+	jae .alphabet_char
+.numeric_char:
+	; In this case we just add 0x30
+	mov al, dl
+	add al,0x30
+	jmp .success
+.alphabet_char:
+	mov al, dl
+	add al,0x37 ; 'A' char code is 0x41 but since our value is at minimum 0xA we need to take that into account
+.success:
+	mov dh, al
+	pop ax
+	ret

@@ -1,0 +1,103 @@
+hello_pp:
+	WRITE hello_msg
+	in	al,0x60	
+	mov byte [pressed_key], al
+	WRITE_LINE pressed_key	
+	push word [old_kb_int_seg]
+	push word [old_kb_int_off]
+	retf
+	
+;AL = character to display.
+;BH = page number.
+;BL = attribute.
+;CX = number of times to write character.
+show_banner2:
+	; Move fs to BDA
+	mov ax,BDA_SEGMENT
+	mov fs,ax
+	; Get the number of columns
+	mov di,0x004A 	
+	mov cx,WORD [fs:di] ; Store no of cols in cl
+	;dec cx
+	; Write char at cursor
+	mov al,0xDB
+	mov bh,0x0
+	mov bl,0x04 ; Color
+	mov ah,0x09 ; Video function 9
+	int 0x10	
+	mov al, 1
+	mov bh, 0
+	mov bl, 0100_1110b ; red_yellow
+	mov cx, msg_end - msg ;0x0018 ; length
+	mov dl, 1 ;col
+	mov dh, 0 ;row
+	push cs
+	pop es
+	mov bp, msg
+	mov ah, 13h
+	int 10h
+	ret
+
+show_banner:
+.start:
+	xor ax,ax
+	xor bx,bx
+	xor cx,cx
+	xor dx,dx
+	xor si,si	
+	; Set video mode
+	mov al, 0x03
+	mov ah, 0x0
+	int 10h	
+	; Move fs to BDA
+	mov ax,0x0040
+	mov fs,ax
+	; Get the number of columns
+	mov di,0x004A 	
+	mov cx,WORD [fs:di] 	; Store no of cols in cl
+	dec cl
+.loop:
+	; Move cursor to row 0 and col cl
+	mov bh,0x0   		; current page. 
+	mov dh,0x0   		; row. 
+	mov dl,cl	  		; col. 
+	mov ah,0x02			; BIOS function
+	int 0x10
+	; Write char at cursor
+	mov al,0xDB
+    mov ah,0x09						; Video function 9
+    mov bl,0x40						; Color
+    int 0x10	
+	; Check if we're done else loop
+	or cl,cl	
+	jz .success
+	dec cl
+	jmp .loop	
+.success:
+	ret
+
+	;check_fd_drive:
+	mov ax,0x0
+	mov	di,ax
+	mov es,ax
+	mov ah,0x08
+	mov dl,BOOT_DEVICE
+	int 0x13
+	jnc	.continue
+	push ERROR_MSG
+	call write_line
+	call hang
+.;continue:	
+	push OK_MSG
+	call write_line
+	call hang
+	
+setup_stack:
+	cli										; clear interupts
+	mov ax,RELOC_SEG
+	add ax,BOOT_SECTOR_SIZE
+	mov ss,ax								; Stack is in the same segment
+	mov ax,STACK_SIZE						; Setting stack pointer
+	mov sp,ax
+	sti										; start interupts
+	ret
