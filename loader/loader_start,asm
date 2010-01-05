@@ -1,8 +1,0 @@
-[BITS 32]
-[global start]
-[extern _ld_main] ; this is in the c file
-
-start:
-  call _ld_main
-  cli ; stop interrupts
-  hlt ; halt the CPU
