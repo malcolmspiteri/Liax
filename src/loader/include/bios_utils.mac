@@ -1,0 +1,117 @@
+; Source name     : boot_utils.mac
+; Code model:     : Real mode flat model
+; Version         : 1.0
+; Created date    : 28/11/2009
+; Last update     : 28/11/2009
+; Author          : Malcolm Spiteri
+; Description     : Various macros for invoking BIOS services
+
+%macro CLEAR_SCREEN 0
+	push ax       	; Push registers which will be used on the stack
+	push bx
+	push cx
+	push dx
+	push ds
+	push di
+	; Clear the screen using BIOS video service
+	mov ax,0x0040
+	mov ds,ax  			; for getting screen parameters. 
+	mov ah,0x06 		; scroll up function id. 
+	mov al,0x0   		; scroll all lines! 
+	mov bh,0x07  		; attribute for new lines. 
+	mov ch,0x0   		; upper row. 
+	mov cl,0x0   		; upper col. 
+	mov di,0x0084 		; rows on screen -1, 
+	mov dh,[di] 		; lower row (byte). 
+	mov di,0x004A 		; columns on screen, 
+	mov dl,[di]
+	dec dl				; lower col. 
+	int 0x10
+	; set cursor position to top 
+	; of the screen: 
+	mov bh,0x0   		; current page. 
+	mov dl,0x0   		; col. 
+	mov dh,0x0   		; row. 
+	mov ah,0x02			; BIOS function
+	int 0x10
+	; re-store registers... 
+	pop di      
+	pop ds       
+	pop dx      
+	pop cx      
+	pop bx       
+	pop ax       
+%endmacro
+
+%macro SET_CURSOR_POS 3
+	push ax
+	push bx
+	push dx	
+	mov bh,%1   		; page. 
+	mov dh,%2   		; row. 
+	mov dl,%3	  		; col. 
+	mov ah,0x02			; BIOS function
+	int 0x10
+	pop dx
+	pop bx
+	pop ax
+%endmacro
+
+%macro WRITE 1     					; 1 parameter pointing to the address of character stream
+	push si
+	push ax
+	push bx
+	mov si,%1						; Print message
+%%.write_start:
+    lodsb           				; AL = [DS:SI]
+    or al,al        				; Set zero flag if al=0
+    jz %%.write_success	 			; Jump to .success if zero flag is set
+    mov ah,0x0E						; Video function 0Eh    
+    int 0x10
+    jmp %%.write_start				; Load characters until AL=0	
+%%.write_success:
+	pop bx
+	pop ax
+	pop si
+%endmacro
+
+%macro WRITE_LINE 1     			; 1 parameter pointing to the address of character stream
+	WRITE %1
+	WRITE CRLF
+%endmacro
+
+; SET_PRE_ISR_HOOK - Goes to the IVT
+; Params: 1 - The interupt number
+;         2 - Old ISR segment
+;         3 - Old ISR offset
+;         4 - New ISR segment
+;         5 - New ISR offset
+%macro SET_PRE_ISR_HOOK 5
+	;save registers
+	push fs
+	push ax
+	push bx
+
+	; Move fs:bx to the start of the interrupt entry (QWORD) we are interested in
+	xor ax, ax ; first clear the AX register
+	mov fs, ax ; load FS (far segment) with the address of interrupt vector table 
+	mov bx, %1 ; load BX with interrupt type
+	
+	; Save the currently defined interrupt handler address
+	mov ax, word [fs:bx] ; load AX with the offset of the currently defined interrupt
+	mov %3, ax ; save the old interrupt offset
+	mov ax, word [fs:bx+2] ; Load AX with the segment address of currently defined interrupt
+	mov %2, ax ; store the old interrupt segment
+	
+	; Now, the interrupt vector table can be loaded with the new locations for our handler
+	cli ; disable interrupts
+	; load the lower interrupt pointer table word with the base address
+	; (BBBBH) of the user's interrupt service routine
+	mov WORD [fs:bx], %5 ; Set new ISR offset
+	mov WORD [fs:bx+2], %4 ; Set new ISR segment
+	sti ; re-enable interrupts 
+	;restore registers
+	pop bx
+	pop ax
+	pop fs
+%endmacro
