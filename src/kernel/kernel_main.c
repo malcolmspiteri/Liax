@@ -2,9 +2,9 @@
 
 unsigned int k_printf(char *message, unsigned int line);
 
-ld_main() // like main in a normal C program
-{
-	k_printf("Hi!\nHow's this for a starter OS?", 0);
+void k_main()
+{	
+	k_printf("Hi!\nWelcome to MalcOS", 10);
 };
 
 unsigned int k_printf(char *message, unsigned int line) // the message and then the line #
