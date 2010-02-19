@@ -10,19 +10,19 @@
 ;*                        loader and kernel.                  			*
 ;********************************************************************************
 
-bits 16	; Set 16 bit code generation
+bits 16
 org 0x0	; We are loaded by BIOS at 0x07c0:0x0000
 
 %define BOOT_SECTOR_SIZE 	0x0200	; 512-bytes
 %define INIT_SEG 		0x07C0	; This is where we start
 %define RELOC_SEG 		0x0050
 
-;; Stack setup defs. Just above the BIOS data area (BDA). Stack's range is 0x00700 to 0x00B00 = 1 Kib
-%define STACK_SEG 		0x0070
-%define STACK_OFFSET 		0x0400
+;; Stack setup defs.
+%define STACK_SEG 		0x0070 ; (BIOS data area size + Relocated boot sector size) / 0x0010
+%define STACK_OFFSET 		0x0400 ; Stack's range is 0x00700 to 0x00B00 = 1 Kib
 
 ;; Loading
-%define ROOT_FAT_OFFSET 	0x0600	; Past stack
+%define ROOT_FAT_OFFSET 	0x0600	; Past stack (0x0050 * 0x0010) + 0x00600 = 0x00B00
 %define STGTWO_SEG 		0x0000
 %define STGTWO_OFFSET 		0x3000				
 
