@@ -10,26 +10,25 @@
 ;*                        loader and kernel.                  			*
 ;********************************************************************************
 
-bits 16
-org 0x0	; We are loaded by BIOS at 0x07c0:0x0000
+bits 16	
+org 0x0	; Assuming we are at 0x07c0:0x0000
 
 %define BOOT_SECTOR_SIZE 	0x0200	; 512-bytes
-%define INIT_SEG 		0x07C0	; This is where we start
-%define RELOC_SEG 		0x0050
+%define INIT_SEG 		0x07C0	; Actually we start at 0x0000:0x07C0
+%define RELOC_SEG 		0x0050	; Stage one will relocates itself to this segment
 
-;; Stack setup defs.
-%define STACK_SEG 		0x0070 ; (BIOS data area size + Relocated boot sector size) / 0x0010
-%define STACK_OFFSET 		0x0400 ; Stack's range is 0x00700 to 0x00B00 = 1 Kib
+; Stack setup defs. Stack's range is 0x00700 to 0x00B00 = 1 Kib
+%define STACK_SEG 		0x0070
+%define STACK_OFFSET 		0x0400
 
-;; Loading
-%define ROOT_FAT_OFFSET 	0x0600	; Past stack (0x0050 * 0x0010) + 0x00600 = 0x00B00
+; Loading
+%define ROOT_FAT_OFFSET 	0x0600	; Temp stoFAT12 Root dir and FAT
 %define STGTWO_SEG 		0x0000
 %define STGTWO_OFFSET 		0x3000				
 
 %define BOOT_DEVICE 		0x0	; Floppy
 %define VOLUME_LABEL 		'MELITE', 0x20, 0x20, 0x20, 0x20, 0x20
 
-%include "./src/loader/include/fat.inc"
 %include "./src/loader/include/fat12.inc"
 
 start:	

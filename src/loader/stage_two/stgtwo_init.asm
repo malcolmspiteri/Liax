@@ -16,6 +16,8 @@ org 0x3000
 %define ROOT_FAT_OFFSET 0x0B00	; Same location stage one uses
 %define KERNEL_SEG 0x0000
 %define KERNEL_OFFSET 0x9000
+%define GDT_CODE_SEGMENT_OFFSET 0x8
+%define GDT_DATA_SEGMENT_OFFSET 0x10
 
 section .text
 
@@ -26,9 +28,10 @@ includes:
 %include "./src/loader/include/util.inc"
 %include "./src/loader/include/biosvid.inc"
 %include "./src/loader/include/biosdio.inc"
-%include "./src/loader/include/fat.inc"
 %include "./src/loader/include/fat12.inc"
 %include "./src/loader/include/bios_utils.mac"
+%include "./src/loader/include/biosmem.inc"
+%include "./src/loader/include/serial.asm"
 
 start_stgtwo:
 
@@ -64,7 +67,9 @@ start_stgtwo:
 	CALL_PROC set_cursor, 0x0, 0x3, 0x1
 	CALL_PROC write, load_gdt_act
 	CALL_PROC write, ok_msg
-
+	;; Detect the amount of memory in the system
+	CALL_PROC detect_memory
+	
 load_kernel:
 
 ;----------------------------------------------------
@@ -107,7 +112,7 @@ load_kernel:
 	call read_sectors
 
 	;----------------------------------------------------
-	; Find stage two image
+	; Find kernel image
 	;----------------------------------------------------
 
 	; browse root directory for binary image
@@ -236,20 +241,31 @@ draw_header:
   	pop ax
   	ret
 
+detect_memory:
+
+	;; Get the amount of low memory first...useless but anyway
+  	CALL_PROC set_cursor, 0x0, 0x4, 0x1
+	CALL_PROC write, lomem
+	CALL_PROC get_lomem, lowmem_amt, failure
+	CALL_PROC word_to_ascii, lowmem_amt, lowmem_amt_txt, lowmem_amt_char
+	CALL_PROC write, HEX_ASCII_REP_PREFIX
+	CALL_PROC write, lowmem_amt_txt
+	ret
+	
 switch_to_pmode:
 
-    cli                     ; Disable interrupts
-    xor ax, ax
-    mov ds, ax              ; Set DS-register to 0 - used by lgdt
-    lgdt [gdt_pointer]	; Load the GDT descriptor
+	cli                     ; Disable interrupts
+	xor ax, ax
+	mov ds, ax              ; Set DS-register to 0 - used by lgdt
+	lgdt [gdt_pointer]		; Load the GDT descriptor
 	
-    mov eax, cr0            
-    or eax, 1               ; Set bit 0
-    mov cr0, eax            ; Copy into CR0 to enable pmode
+	mov eax, cr0            
+	or eax, 1               ; Set bit 0
+	mov cr0, eax            ; Copy into CR0 to enable pmode
 
-	push 0x8
+	push GDT_CODE_SEGMENT_OFFSET
 	push pmode_start
-    retf      		; Far jump to fix CS & IP
+	retf      				; Far jump to fix CS & IP
 
 
 ;************************************************
@@ -329,7 +345,11 @@ lba_to_chs:
 
 failure:
      
-    CALL_PROC write, ERROR_MSG
+	CALL_PROC write, ERROR_MSG
+
+die:
+
+	jmp die
 
 bits 32
 
@@ -341,7 +361,7 @@ pmode_start:
 	;   Set registers		;
 	;-------------------------------;
 
-	mov	ax, 0x10		; set data segments to data selector (0x10)
+	mov	ax, GDT_DATA_SEGMENT_OFFSET		; set data segments to data selector (0x10) 
 	mov	ds, ax
 	mov	ss, ax
 	mov	es, ax
@@ -350,6 +370,7 @@ pmode_start:
     mov byte [ds:0B8000h], 'P'      ; Move the ASCII-code of 'P' into first video memory
     mov byte [ds:0B8001h], 1Bh      ; Assign a color code
 	call KERNEL_OFFSET
+	jmp die32
 
 	%define IMAGE_PMODE_BASE 0x9000	
 	mov    ebx, [IMAGE_PMODE_BASE+60]	; e_lfanew is a 4 byte offset address of the PE header; it is 60th byte. Get it
@@ -365,13 +386,17 @@ pmode_start:
 	 add ebp, eax ; add image base to entry point address
 
     ;call ebp ; Execute Kernel
-die: 	jmp die
 	
 	;; call _ld_main	
   	
+die32:	jmp die32
+	
 section .data
 
-header_title db 'Melite Loader', 0x0
+header_title db 'Liax Loader for x86', 0x0
+
+;; Memory detection messages
+lomem db 'Detecting low memory...', 0x0
 
 gdt:                    ; Address for the GDT
 
@@ -423,5 +448,10 @@ iend
 PROGRESS_IND db '.', 0
 ERROR_MSG 		db 'ERROR', 0
 PE_FILENAME db 'KERNEL  EXE'
+HEX_ASCII_REP_PREFIX db '0x', 0
 
 section .bss
+
+lowmem_amt resb 2
+lowmem_amt_txt resb 5
+lowmem_amt_char resb 1
