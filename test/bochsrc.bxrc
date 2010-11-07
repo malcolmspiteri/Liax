@@ -7,7 +7,7 @@ romimage: file="C:\Program Files\Bochs-2.4.2/BIOS-bochs-latest"
 vgaromimage: file="C:\Program Files\Bochs-2.4.2/VGABIOS-lgpl-latest"
 boot: floppy
 floppy_bootsig_check: disabled=0
-floppya: type=1_44, 1_44="C:\Projects\MeliteOS\test\img\floppy.img", status=inserted
+floppya: type=1_44, 1_44="C:\Users\malcolm\Projects\MeliteOS\test\img\floppy.img", status=inserted
 # no floppyb
 ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
 ata1: enabled=1, ioaddr1=0x170, ioaddr2=0x370, irq=15
@@ -15,7 +15,7 @@ ata2: enabled=0
 ata3: enabled=0
 parport1: enabled=1, file=""
 parport2: enabled=0
-com1: enabled=1, mode=null, dev=""
+com1: enabled=1, mode=file, dev="c:\temp\serial.out"
 com2: enabled=0
 com3: enabled=0
 com4: enabled=0
