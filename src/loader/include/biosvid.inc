@@ -38,14 +38,14 @@ clear_screen:
 
 	; Clear the screen using BIOS video service
 	mov ax,0x0040
-	mov fs,ax  			; for getting screen parameters. 
+	mov fs,ax  		; for getting screen parameters. 
 	mov ah,0x06 		; scroll up function id. 
 	mov al,0x0   		; scroll all lines! 
 	mov bh,0x07  		; attribute for new lines. 
 	mov ch,0x0   		; upper row. 
 	mov cl,0x0   		; upper col. 
 	mov di,0x0084 		; rows on screen -1, 
-	mov dh,BYTE [fs:di] 		; lower row (byte). 
+	mov dh,BYTE [fs:di] 	; lower row (byte). 
 	mov di,0x004A 		; columns on screen, 
 	mov dl,BYTE [fs:di]
 	dec dl				; lower col. 
