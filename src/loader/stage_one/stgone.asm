@@ -1,30 +1,24 @@
-;********************************************************************************
-;* Name			: stgone						*
-;* Code model		: Real mode flat model					*
-;* Version		: 1.0							*
-;* Date			: 27/11/2009						*
-;* Author		: Malcolm Spiteri					*
-;* Description		: System Bootstrap. The bootstrap relocates itself	*
-;*                        to another address and loads the the Melite Loader.	* 
-;*                        It also sets up the stack which will be used by the	*
-;*                        loader and kernel.                  			*
-;********************************************************************************
+; Name			: stgone
+; Version		: 0.1
+; Date			: 27/11/2009
+; Author		: Malcolm Spiteri
+; Description		: System Bootstrap
 
 bits 16	
 org 0x0	; Assuming we are at 0x07c0:0x0000
 
 %define BOOT_SECTOR_SIZE 	0x0200	; 512-bytes
 %define INIT_SEG 		0x07C0	; Actually we start at 0x0000:0x07C0
-%define RELOC_SEG 		0x0050	; Stage one will relocates itself to this segment
+%define RELOC_SEG 		0x0050	; Stage one will relocate itself to this segment
 
 ; Stack setup defs. Stack's range is 0x00700 to 0x00B00 = 1 Kib
 %define STACK_SEG 		0x0070
 %define STACK_OFFSET 		0x0400
 
 ; Loading
-%define ROOT_FAT_OFFSET 	0x0600	; Temp stoFAT12 Root dir and FAT
+%define ROOT_FAT_OFFSET 	0x0600	; Just past the stack. RELOC_SEG:ROOT_FAT_OFFSET = 0x00B00
 %define STGTWO_SEG 		0x0000
-%define STGTWO_OFFSET 		0x3000				
+%define STGTWO_OFFSET 		0x3000
 
 %define BOOT_DEVICE 		0x0	; Floppy
 %define VOLUME_LABEL 		'MELITE', 0x20, 0x20, 0x20, 0x20, 0x20
@@ -41,7 +35,7 @@ istruc fat_oem_block
       at oem,			db	'Melite  '
       at bytes_per_sector,	dw 	512
       at sectors_per_cluster,	db	1
-      at reserved_sectors,	dw	1
+      at reserved_sectors,	dw	4
       at no_fats,		db	2
       at no_root_entries,	dw	224
       at no_sectors,		dw	2880
@@ -92,16 +86,16 @@ hang: 	jmp hang
 %include "./src/loader/include/biosvid.inc"
 %include "./src/loader/include/biosdio.inc"
 
-	;; *********************************************************
-	;; Setup a stack
-	;; *********************************************************
+;; *********************************************************
+;; Setup a stack
+;; *********************************************************
 	
 setup_stack:
-	cli			; clear interupts
+	cli ; clear interupts
 	mov ax,STACK_SEG
-	mov ss,ax		; Stack is in the same segment
+	mov ss,ax
 	mov sp,STACK_OFFSET
-	sti			; start interupts
+	sti ; start interupts
 	ret
 
 ;************************************************
@@ -123,7 +117,7 @@ load_setup:
 
 	xor cx, cx
 	xor dx, dx
-	mov ax, 0x0020                  
+	mov ax, 0x0020 ; sizeof directory entry is 32-bits
 	mul WORD [oemb+no_root_entries]
 	div WORD [oemb+bytes_per_sector]
 	; If the divide left a remainder it should be in dx	
@@ -341,24 +335,25 @@ failure:
     int 0x16                                ; await keypress
     int 0x19                                ; warm boot computer
 
-CRLF 			db 0x0D, 0x0A, 0
+CRLF 		db 0x0D, 0x0A, 0
 PROGRESS_IND	db '.', 0
 LOADING_MSG 	db 'Melite is loading', 0
-ERROR_MSG 		db 'ERROR', 0
+ERROR_MSG 	db 'ERROR', 0
 
-;Parameters used for loading the second stage boot loader
+; Parameters used for loading the second stage boot loader
+
 stgtwo_dchs:
 
 istruc dchs
-	  at drive,			db	0x0
-	  at cylinder,		db	0x0
-      at head,			db	0x0
-      at sector,		db 	0x0
-      at datasector,  dw 0x0000
-      at cluster,     dw 0x0000
+	at drive,	db 0x0
+	at cylinder,	db 0x0
+	at head,	db 0x0
+	at sector,	db 0x0
+	at datasector,  dw 0x0000
+	at cluster,     dw 0x0000
 iend
 
 PE_FILENAME db 'MELOADERSYS'
 
-times 510 - ($-$$) db 0					; We have to be 512 bytes. Clear the rest of the bytes with 0
-dw 0xAA55								; Boot Signiture
+times 510 - ($-$$) db 0	; We have to be 512 bytes. Clear the rest of the bytes with 0
+dw 0xAA55 ; Boot Signiture
