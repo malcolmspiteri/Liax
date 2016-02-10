@@ -6,7 +6,7 @@ void print_mzdos_exe_header(MZDOS_EXE *stub);
 
 int main(void) {
 	
-	char *filename = "C:\\Projects\\PEInspector\\Tail.exe";
+	char *filename = "/cygdrive/c/Program Files/7-Zip/7z.exe";
 	
 	FILE *f = fopen(filename, "r");
 	
